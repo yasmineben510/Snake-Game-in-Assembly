@@ -58,7 +58,9 @@ set_pixel:
 	;computes the word to store
 	addi t3, zero, 1 ; stores the value 1
 	sll t2,t3, t1 ; shifts the value 1 by t1 indexes
-	or t2, t0, t2 ; previous value OR new value (bitwise)
+	;loads word and make an or
+	ldw t4, LEDS(t0)
+	or t2, t4, t2 ; previous value OR new value (bitwise)
 	
 	;store the new word 
 	stw t2, LEDS(t0)

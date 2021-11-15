@@ -30,7 +30,32 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
+	call clear_leds ; on sait pas oourquoi ca marche ni ce que l'on fait SOS SVP
+	addi a0, zero, 3
+	addi a1, zero, 0
+	call set_pixel
+	addi a0, zero, 7
+	addi a1, zero, 1
+	call set_pixel
 
+	addi a0, zero, 5
+	addi a1, zero, 3
+	call set_pixel
+	
+	addi a0, zero, 2
+	addi a1, zero, 4
+	call set_pixel
+
+	addi a0, zero, 10
+	addi a1, zero, 2
+	call set_pixel
+
+	addi a0, zero, 11
+	addi a1, zero, 3
+	call set_pixel
+	
+	
+	
     ret
 
 
@@ -39,6 +64,8 @@ clear_leds:
 	stw zero, LEDS(zero)
 	stw zero, (LEDS + 4)(zero)
 	stw zero, (LEDS + 8)(zero) 
+
+	ret
 
 ; END: clear_leds
 	
@@ -51,9 +78,9 @@ set_pixel:
 	slli t0, t0, 2 ; shifts left by 2 : Word adress In lEDS stored in t0
 
 	;compute the index of the word to set
-	slli t1, a0, 3 ; shifts x left by 3 (multiplies by 8) {8*x}
-	andi t1, t1, 3 ; acts as a modulo 4 {[8*x]mod4}
-	add t1, t1, a1; {[8*x]mod4 + y}
+	andi t1, a0, 3 ; acts as a modulo 4 {[x]mod4}
+	slli t1, t1, 3 ; shifts [x]mod4 left by 3 (multiplies by 8) {8*x}
+	add t1, t1, a1; {8[x]mod4 + y}
 
 	;computes the word to store
 	addi t3, zero, 1 ; stores the value 1
@@ -64,6 +91,8 @@ set_pixel:
 	
 	;store the new word 
 	stw t2, LEDS(t0)
+
+	ret
 
 ; END: set_pixel
 
