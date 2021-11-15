@@ -41,10 +41,27 @@ clear_leds:
 	stw zero, (LEDS + 8)(zero) 
 
 ; END: clear_leds
-
+	
 
 ; BEGIN: set_pixel
 set_pixel:
+
+	;compute the LEDS WORD adress
+	srli t0, a0, 2 ; shifts right by 2 (divides by 4)
+	slli t0, t0, 2 ; shifts left by 2 : Word adress In lEDS stored in t0
+
+	;compute the index of the word to set
+	slli t1, a0, 3 ; shifts x left by 3 (multiplies by 8) {8*x}
+	andi t1, t1, 3 ; acts as a modulo 4 {[8*x]mod4}
+	add t1, t1, a1; {[8*x]mod4 + y}
+
+	;computes the word to store
+	addi t3, zero, 1 ; stores the value 1
+	sll t2,t3, t1 ; shifts the value 1 by t1 indexes
+	or t2, t0, t2 ; previous value OR new value (bitwise)
+	
+	;store the new word 
+	stw t2, LEDS(t0)
 
 ; END: set_pixel
 
