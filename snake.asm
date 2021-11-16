@@ -123,6 +123,63 @@ hit_test:
 
 ; BEGIN: get_input
 get_input:
+    ldw t0, (BUTTONS + 4)(zero)  ; gets the edgecapture
+    andi s0, t0, 31              ; gets the 5 LSBs
+     
+    ldw t1, BUTTONS(zero)        ; gets the status
+    andi s1, t1, 31              ; gets the 5 LSBs
+    
+    bne  s0, zero, checkpoint    ; branches to checkpoint if buttons were pushed
+    addi  v0, zero, 0            ; returns 0
+    jmpi  end                    ; jumps to end 
+
+
+checkpoint:
+    srli t2, s0, 4               ; gets the checkpoint bit
+    add t0, zero, zero           ; initializes our current value to 0 (useful if direction is called)
+    add t3, zero, zero           ; initializes our current value to 0 (useful if state is called)
+
+    beq  t2, zero, directions    ; branches to direction if checkpoint button hasn't been pressed
+    addi  v0, zero, 5            ; returns 5
+    jmpi  end                    ; jumps to end 
+
+
+directions:
+    
+    addi t0, t0, 1               ; increment current by one
+    sll t1, s0, t0               ; 
+    andi t1, t1, 1               ; gives the to'th bit of the edgecapture, with step above
+    beq t1, zero, directions     ; if the bit is not 1, it is not the right one, we loop
+    add v0, zero, t0             ; return value
+    jmpi  state
+
+
+state:
+    bne  s1, zero, computeState    ; branches to computeState if buttons were pushed previously
+    jmpi changeState
+
+
+computeState:
+
+    addi t3, t3, 1               ; increment current by one
+    sll t1, s0, t3               ; 
+    andi t1, t1, 1               ; gives the t3'th bit of the edgecapture, with step above
+    beq t1, zero, state          ; if the bit is not 1, it is not the right one, we loop again
+   
+    addi t4, v0, t3              ; add our pushed button with our status, if the addition is equal to 5 we do not modify the state of our snake
+    addi t5, zero, 5            
+    bne  t5, t4, changeState
+    jmpi end
+
+
+changeState:
+   
+    
+
+end: 
+    stw zero, (BUTTONS + 4)(zero); sets edgecapture at 0
+    ret
+    
 
 ; END: get_input
 
