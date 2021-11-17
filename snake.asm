@@ -30,10 +30,21 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
+    add a0, zero, zero           ; sets food to zero
+    addi t0, zero, 3
+
+    stw zero, HEAD_X(zero)		 ; position x of head
+	stw zero, HEAD_Y(zero) 		 ; position y of head
+    stw zero, TAIL_X(zero)		 ; position x of head
+	stw zero, TAIL_Y(zero) 		 ; position y of head
+    stw t3, GSA(zero)            ; direction right in GSA
+  
 	call clear_leds 		
 	call get_input
-	
-	
+	call move_snake
+	call draw_array
+    jmpi main
+
     ret
 
 
@@ -150,7 +161,12 @@ computeState:
 
 changeState:
    
-    
+    ldw t5, HEAD_X(zero)		 ; position x of head
+	ldw t6, HEAD_Y(zero) 		 ; position y of head
+   	slli t7, t5, 3 			   	 ; multiplies x by 8
+	add t7, t7, t6 				 ; adds y => linear adress of tail on GSA in t0
+    stw v0, GSA(t7) 			 ;sets the orientation vector of the head (same as the last head
+    jmpi endGET
 
 endGET: 
     stw zero, (BUTTONS + 4)(zero); sets edgecapture at 0
