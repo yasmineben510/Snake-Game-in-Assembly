@@ -39,10 +39,10 @@ main:
 	stw zero, TAIL_Y(zero) 		 ; position y of head
     stw t3, GSA(zero)            ; direction right in GSA
   
-	call clear_leds 		
+	;call clear_leds 		
 	call get_input
-	call move_snake
-	call draw_array
+	;call move_snake
+	;call draw_array
     jmpi main
 
     ret
@@ -105,24 +105,79 @@ create_food:
 ; BEGIN: hit_test
 hit_test:
 
+    ldw t0, HEAD_X(zero)		 ; position x of head
+	ldw t1, HEAD_Y(zero) 		 ; position y of head
+   	slli t2, t0, 3 			   	 ; multiplies x by 8
+	add t2, t2, t1 				 ; adds y => t2 is the linear adress of head on GSA
+    slli t2, t2, 2               ; gets the right address
+    ldw t3, GSA(t2) 			 ; gets the orientation vector of the head (same as the last head)
+     
+    beq t0, zero, checkLeft      ; checks if both x=0 and GSA=1
+    beq t1, zero, checkUp        ; checks if both y=0 and GSA =2
+    addi t4, zero, 7            
+    beq t1, t4, checkDown        ; checks if both y=7 and GSA =3
+    addi t4, zero, 11   
+    beq t0, t4, checkRight       ; checks if both y=7 and GSA =4
+   
+    jmpi GSAValue
+    
+
+checkLeft:
+    addi t4, zero, 1
+    beq t3, zero, abort
+    jmpi GSAValue
+
+checkUp:
+    addi t4, zero, 2
+    beq t3, t4, abort
+    jmpi GSAValue
+
+checkDown:
+    addi t4, zero, 3
+    beq t3, t4, abort
+    jmpi GSAValue
+
+checkRight:
+    addi t4, zero, 4
+    beq t3, t4, abort           
+    jmpi GSAValue
+
+GSAValue:  
+    beq t3, zero, noCollision   ; if the GSA value is zero, there is no collision
+    addi t4, zero, 5
+    beq t3, t4, scoreIncrement  ; if the GSA value is one there is a food => score increment
+    jmpi abort                  ; else there is a bit of the snake => abort
+
+abort:
+    addi v0, zero, 2   
+    ret
+
+noCollision:
+    add v0, zero, zero
+    ret
+
+scoreIncrement:
+    addi v0, zero, 1
+    ret
+
 ; END: hit_test
 
 
 ; BEGIN: get_input
 get_input:
     ldw t0, (BUTTONS + 4)(zero)  ; gets the edgecapture
-    andi s0, t0, 31              ; gets the 5 LSBs
+    andi t6, t0, 31              ; gets the 5 LSBs
      
     ldw t1, BUTTONS(zero)        ; gets the status
-    andi s1, t1, 31              ; gets the 5 LSBs
+    andi t7, t1, 31              ; gets the 5 LSBs
     
-    bne  s0, zero, checkpoint    ; branches to checkpoint if buttons were pushed
-    addi  v0, zero, 0            ; returns 0
+    bne  t6, zero, checkpoint    ; branches to checkpoint if buttons were pushed
+    add  v0, zero, zero          ; returns 0
     jmpi  endGET                 ; jumps to endGET 
 
 
 checkpoint:
-    srli t2, s0, 4               ; gets the checkpoint bit
+    srli t2, t6, 4               ; gets the checkpoint bit
     add t0, zero, zero           ; initializes our current value to 0 (useful if direction is called)
     add t3, zero, zero           ; initializes our current value to 0 (useful if state is called)
 
@@ -133,38 +188,38 @@ checkpoint:
 
 directions:
     
-    addi t0, t0, 1               ; increment current by one
-    srl t1, s0, t0               ; 
+    srl t1, t6, t0               ; 
     andi t1, t1, 1               ; gives the t0'th bit of the edgecapture, with step above
+    addi t0, t0, 1               ; increment current by one
     beq t1, zero, directions     ; if the bit is not 1, it is not the right one, we loop
     add v0, zero, t0             ; return value
     jmpi  state
 
 
 state:
-    bne  s1, zero, computeState    ; branches to computeState if buttons were pushed previously
+    bne  t7, zero, computeState    ; branches to computeState if buttons were pushed previously
     jmpi changeState
 
 
 computeState:
 
+    srl t1, t7, t3               ; 
+    andi t1, t1, 1               ; gives the t3'th bit of the status, with step above
     addi t3, t3, 1               ; increment current by one
-    srl t1, s0, t3               ; 
-    andi t1, t1, 1               ; gives the t3'th bit of the edgecapture, with step above
-    beq t1, zero, state          ; if the bit is not 1, it is not the right one, we loop again
-   
+    bne t1, zero, computeState          ; if the bit is not 0, it is not the right one, we loop again
     add t4, v0, t3               ; add our pushed button with our status, if the addition is equal to 5 we do not modify the state of our snake
     addi t5, zero, 5            
     bne  t5, t4, changeState
     jmpi endGET
 
 
-changeState:
-   
+changeState:  
+    ; do not need the ancient t6 and t7 values
     ldw t5, HEAD_X(zero)		 ; position x of head
 	ldw t6, HEAD_Y(zero) 		 ; position y of head
    	slli t7, t5, 3 			   	 ; multiplies x by 8
-	add t7, t7, t6 				 ; adds y => linear adress of tail on GSA in t0
+	add t7, t7, t6 				 ; adds y => linear adress of head on GSA in t0
+    slli t7, t7, 2               ; fins the corresponding address
     stw v0, GSA(t7) 			 ;sets the orientation vector of the head (same as the last head
     jmpi endGET
 
