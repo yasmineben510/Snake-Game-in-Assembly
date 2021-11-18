@@ -31,18 +31,20 @@ addi    sp, zero, LEDS
 main:
     ; TODO: Finish this procedure.
     add a0, zero, zero           ; sets food to zero
-    addi t0, zero, 3
+    addi t0, zero, 4
 
     stw zero, HEAD_X(zero)		 ; position x of head
 	stw zero, HEAD_Y(zero) 		 ; position y of head
     stw zero, TAIL_X(zero)		 ; position x of head
 	stw zero, TAIL_Y(zero) 		 ; position y of head
-    stw t0, GSA(zero)            ; direction right in GSA
+  ;  stw t0, GSA(zero)            ; direction down in GSA
   mainloop:
 	call clear_leds 		
-	call get_input
-	call move_snake
+;	call get_input
+	call create_food
 	call draw_array
+;	call move_snake
+
     jmpi mainloop
 
     ret
@@ -257,22 +259,22 @@ addi sp, sp, -12
 	stw s1, 0(sp)
 
 	addi s0, zero, -1			; iterator x init
-	addi s1, zero, -1			; iterator y init
 
 	loopDrawX:
 	addi s0, s0, 1				; increments x by 1
+	addi s1, zero, -1			; iterator y init again
 	addi t3, zero, 12			; stop value of loop x
 
-	bge s0, t3, endDraw			; stop loop condition
+	beq s0, t3, endDraw			; stop loop condition
 	loopDrawY:
 
 	addi s1, s1, 1				; increment y by 1
 	addi t5, zero, 8			; stop value of loop y
 
-	bge s1, t5, loopDrawX		; end of first range loop of y, need to increment x
-	
+	beq s1, t5, loopDrawX		; end of first range loop of y, need to increment x
+	;-----computes the linear adress ---------
 	slli t6, s0, 3				; multiplies x by 8
-	add t6, s0, s1				; adds y => linear adress of head on GSA
+	add t6, t6, s1				; adds y => linear adress of head on GSA
 	slli t6, t6, 2				; adresses should be WORD_ALIGNED (*4)
 
 	ldw t2, GSA(t6)				; value of the current GSA cell
@@ -311,7 +313,7 @@ move_snake:
 	ldw t6, HEAD_Y(zero) 		 ; position y of head
 
 	slli t0, t5, 3				 ; multiplies x by 8
-	add t0, t0, t6				 ; adds 8 => linear adress of head on GSA
+	add t0, t0, t6				 ; adds y => linear adress of head on GSA
 	slli t0, t0, 2				 ; adresses should be WORD_ALIGNED (*4)
 
 	ldw t0, GSA(t0)				 ; VALUE of the SNAKE HEAD IN THE GSA => Orientation vector head
@@ -322,7 +324,7 @@ move_snake:
 	beq t0, t3, down
 	beq t0, t4, right
 
-;---updates the HEAD X AND HEAD Y COORDINATES ; NOTE Still needs to compute mod 12 for the new x and y
+;---updates the HEAD X AND HEAD Y COORDINATES ; 
 left:							; updates the x coord to the left 
 	ldw t7, HEAD_X(zero) 		; position x of head
 	addi t5, t7, -1
@@ -352,17 +354,17 @@ endHead:
 	ldw t6, HEAD_Y(zero)		; position y of head
 
 	slli t7, t5, 3 				; multiplies x by 8
-	add t7, t7, t6				; adds 8 => linear adress of head on GSA
+	add t7, t7, t6				; adds y => linear adress of head on GSA
 	slli t7, t7, 2				; adresse are word aligned
 
-	stw t0, GSA(t0) 			;sets the orientation vector of the head (same as the last head)
+	stw t0, GSA(t7) 			;sets the orientation vector of the head (same as the last head)
 
 	;--------value of snake's tail ---------------
 	ldw t5, TAIL_X(zero) 		; position x of tail
 	ldw t6, TAIL_Y(zero) 		; position y of tail
 
 	slli t7, t5, 3 				; multiplies x by 8
-	add t0, t7, t6 				; adds 8 => linear adress of tail on GSA in t0
+	add t0, t7, t6 				; adds y => linear adress of tail on GSA in t0
 	slli t0, t0, 2				; adresse are word aligned
 
 	ldw t7, GSA(t0) 			; VALUE of the SNAKE TAIL IN THE GSA => Orientation vector tail
