@@ -37,13 +37,13 @@ main:
 	stw zero, HEAD_Y(zero) 		 ; position y of head
     stw zero, TAIL_X(zero)		 ; position x of head
 	stw zero, TAIL_Y(zero) 		 ; position y of head
-    stw t3, GSA(zero)            ; direction right in GSA
-  
-	;call clear_leds 		
+    stw t0, GSA(zero)            ; direction right in GSA
+  mainloop:
+	call clear_leds 		
 	call get_input
-	;call move_snake
-	;call draw_array
-    jmpi main
+	call move_snake
+	call draw_array
+    jmpi mainloop
 
     ret
 
@@ -98,7 +98,27 @@ init_game:
 
 ; BEGIN: create_food
 create_food:
-
+	addi t0, zero, 96				; off limite value for the GSA array
+	addi t1, zero, 255				; create mask
+loopFood:
+	ldw t2, RANDOM_NUM(zero)		; random adress received
+	and t2, t2, t1					; takes the lowest byte
+	bge t2, t0, loopFood			; checks if the random num is in range
+	slli t2, t2, 2					; makes the adress word aligned
+	ldw t4, GSA(t2)					; gets the value of the GSA cell in T2
+	addi t3, zero, 0 				; value 0 stored in t3
+	bne t4, t3, loopFood			; checks if the cell is empty to generate food => if not loop again
+	addi t3, zero, 5				; stores value 5
+	stw t3, GSA(t2)					; stores value 5 in the GSA AT LOCATION T2 = random * 4
+	;----------STACK SVAING ADRESS
+	;push ra
+	addi sp, sp, -4
+	stw ra, 4(sp)
+	call draw_array
+	; pop ra.
+	ldw ra, 4(sp)
+	addi sp, sp, 4
+	ret
 ; END: create_food
 
 
@@ -231,26 +251,50 @@ endGET:
 
 ; BEGIN: draw_array
 draw_array:
+addi sp, sp, -12
+	stw ra, 8(sp)				; stacks the main return address
+	stw s0, 4(sp)
+	stw s1, 0(sp)
 
-	addi t0, zero, 0 			;stores value 0
-	addi t1, zero, 0			;iterator init
-	addi t3, zero, 388			;stop value of loop: last gsa word + 1 : (96+1)*4 #word-aligned
-	add s0, ra, zero			;stacks the main return address in s0
+	addi s0, zero, -1			; iterator x init
+	addi s1, zero, -1			; iterator y init
 
-	loopDraw:
-	beq t1, t3, endDraw			;stop loop condition
+	loopDrawX:
+	addi s0, s0, 1				; increments x by 1
+	addi s1, zero, -1			; iterator y init again
+	addi t3, zero, 12			; stop value of loop x
 
-	ldw t2, GSA(t1)				;value of the current GSA cell
-	addi t1, t1, 4 				;increments by 4
+	bge s0, t3, endDraw			; stop loop condition
+	loopDrawY:
 
-	beq t0, t2, loopDraw		; if t2 is zero, loop
+	addi s1, s1, 1				; increment y by 1
+	addi t5, zero, 8			; stop value of loop y
+
+	bge s1, t5, loopDrawX		; end of first range loop of y, need to increment x
+	
+	slli t6, s0, 3				; multiplies x by 8
+	add t6, s0, s1				; adds y => linear adress of head on GSA
+	slli t6, t6, 2				; adresses should be WORD_ALIGNED (*4)
+
+	ldw t2, GSA(t6)				; value of the current GSA cell
+
+	addi t0, zero, 0 			; stores value 0
+	beq t0, t2, loopDrawY		; if t2 is zero, loop
 		 
-	; sets a0 and a1 (how to compute these values?)
+	; ------sets a0 to x and a1 to y----
+	add a0, s0, zero
+	add a1, s1, zero
 	call set_pixel 
-	jmpi loopDraw
+	jmpi loopDrawY
 
-	endDraw: 
-	add ra, s0, zero		;pop the initial return value 
+	endDraw:
+	ldw s1, 0(sp)
+	addi sp, sp, 4
+	ldw s0, 0(sp)
+	addi sp, sp, 4
+		
+	ldw ra, 0(sp)				;pop the initial return value 
+	addi sp, sp, 4		
 	ret
 ; END: draw_array
 
@@ -312,7 +356,7 @@ endHead:
 	add t7, t7, t6				; adds 8 => linear adress of head on GSA
 	slli t7, t7, 2				; adresse are word aligned
 
-	stw t0, GSA(t0) 			;sets the orientation vector of the head (same as the last head)
+	stw t0, GSA(t7) 			;sets the orientation vector of the head (same as the last head)
 
 	;--------value of snake's tail ---------------
 	ldw t5, TAIL_X(zero) 		; position x of tail
@@ -362,8 +406,6 @@ endTail:
 	addi t7, zero, 0
 	stw t7, GSA(t0)
 	ret
-
-
 ; END: move_snake
 
 
