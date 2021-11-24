@@ -101,7 +101,7 @@ main:
 	call create_food
 	call save_checkpoint
 	addi t0, zero, 1 			; stores value for a saved checkpoint
-	beq v0,t0, state_blinkScore
+	beq v0,t0, state_blinkScore	; f checkpoint is saved (v0 =1) then blink score
 	jmpi state_draw
 
 
@@ -135,7 +135,6 @@ clear_leds:
 	stw zero, LEDS(zero)
 	stw zero, (LEDS + 4)(zero)
 	stw zero, (LEDS + 8)(zero)
-
 	ret
 
 ; END: clear_leds
@@ -183,8 +182,8 @@ moduloop:
   jmpi moduloop
 
 DISP_sel :
-  ;slli t0, t0, 4                      ; allows us to find the word-aligned address in our table
- ; slli t1, t1, 4                      ; allows us to find the word-aligned address in our table
+  slli t0, t0, 2                      ; allows us to find the word-aligned address in our table
+  slli t1, t1, 2                      ; allows us to find the word-aligned address in our table
   ldw  t3,  digit_map(t1)             ; finds the right combination to the 3rd 7-seg
   ldw  t4,  digit_map(t0)             ; finds the right combination to the 4th 7-seg
   ldw  t5,  digit_map(zero)           ; finds the default value for zero
@@ -248,7 +247,7 @@ init_game:
 	stw t0, GSA(zero)            ; direction right in GSA
 
 	;---set the score to zero
-	addi t0, zero, 0
+	addi t0, zero, 9
 	stw t0, SCORE(zero)
 	;--display food at random location
 	jmpi create_food
@@ -379,9 +378,6 @@ get_input:
     ldw t0, (BUTTONS + 4)(zero)  ; gets the edgecapture
     andi t6, t0, 31              ; gets the 5 LSBs
 
-    ldw t1, BUTTONS(zero)        ; gets the status
-    andi t7, t1, 31              ; gets the 5 LSBs
-
     bne  t6, zero, checkpoint    ; branches to checkpoint if buttons were pushed
     add  v0, zero, zero          ; returns 0
     jmpi  endGET                 ; jumps to endGET
@@ -404,24 +400,7 @@ directions:
     addi t0, t0, 1               ; increment current by one
     beq t1, zero, directions     ; if the bit is not 1, it is not the right one, we loop
     add v0, zero, t0             ; return value
-    jmpi  state
-
-
-state:
-    bne  t7, zero, computeState    ; branches to computeState if buttons were pushed previously
-    jmpi changeState
-
-
-computeState:
-
-    srl t1, t7, t3               ;
-    andi t1, t1, 1               ; gives the t3'th bit of the status, with step above
-    addi t3, t3, 1               ; increment current by one
-    bne t1, zero, computeState          ; if the bit is not 0, it is not the right one, we loop again
-    add t4, v0, t3               ; add our pushed button with our status, if the addition is equal to 5 we do not modify the state of our snake
-    addi t5, zero, 5
-    bne  t5, t4, changeState
-    jmpi endGET
+    jmpi  changeState
 
 
 changeState:
@@ -431,6 +410,12 @@ changeState:
    	slli t7, t5, 3 			   	 ; multiplies x by 8
 	add t7, t7, t6 				 ; adds y => linear adress of head on GSA in t0
     slli t7, t7, 2               ; fins the corresponding address
+    
+    ldw t0, GSA(t7)
+    add t4, v0, t0
+    addi t5, zero, 5
+    beq t4, t5, endGET
+
     stw v0, GSA(t7) 			 ;sets the orientation vector of the head (same as the last head
     jmpi endGET
 
@@ -609,13 +594,19 @@ endMove:
 ; BEGIN: save_checkpoint
 save_checkpoint:
 	addi v0, zero, 0
+	ldw t0, SCORE(zero)                 ; takes the value of the score
+ 	add t1, zero, zero                  ; prepares the quotient q (now =0)
+    bne t0, zero, moduloopSave 
+	jmpi endSave
+
 moduloopSave:
 	addi t2, t0, -10				  ; compute the number of time we have 10 in t0 by substracting 10
-	blt  t2, zero, endModuloop		  ; if value is smaller than zero, result : t0=the result of the modulo 10
+	blt  t2, zero, endModuloopSave		  ; if value is smaller than zero, result : t0=the result of the modulo 10
 	addi t1, t1, 1                    ; increments quotient value
 	add  t0, t2, zero                 ; computes new rest value
 	jmpi moduloopSave
-endModuloop:
+
+endModuloopSave:
 
 	bne t0, zero, endSave			  ; if the score is not a multiple of 10, finsishes the method	
 	;-----CASE CP CALL IS VALID-----
@@ -629,8 +620,8 @@ endModuloop:
 	addi a1, zero, CP_HEAD_X 	; init value of iteration over dest data adress
 	addi a0, zero, HEAD_X		; init value of iteration over source data adress
 
-	addi t5, zero, GSA			; computing of limit value for t7
-	addi t5, t5, 384			; computing of limit value for t7=> GSAaddr + 96*4
+	addi t5, zero, GSA			; computing of limit value for a0
+	addi t5, t5, 384			; computing of limit value for a0=> GSAaddr + 96*4
 
 loopsave:
 	call copy_data
@@ -660,11 +651,12 @@ restore_checkpoint:
 	stw ra, 0(sp)
 
 	addi v0, zero, 1			; returns 1 because the checkpoint is valid
+
 	addi a0, zero, CP_HEAD_X 	; init value of iteration over source data adress
 	addi a1, zero, HEAD_X		; init value of iteration over dest data adress
 
-	addi t5, zero, GSA			; computing of limit value for t7
-	addi t5, t5, 384			; computing of limit value for t7=> GSAaddr + 96*4
+	addi t5, zero, GSA			; computing of limit value for a1
+	addi t5, t5, 384			; computing of limit value for a1=> GSAaddr + 96*4
 loopstore:
 	call copy_data
 	addi a0, a0, 4
@@ -692,21 +684,21 @@ copy_data:
 
 ; BEGIN: blink_score
 blink_score:
-	addi t3, zero, 3                     ; number of times it will blink = 3
-	jmpi blink_loop
-
-blink_loop:
 	addi sp, sp, -4 
 	stw ra, 0(sp) 				; stacks the main return address
 
-	addi t3, t3, -1
+	addi t7, zero, 3                     ; number of times it will blink = 3
+	jmpi blink_loop
+
+blink_loop:
+	addi t7, t7, -1
 	stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
 	stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
 	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
 	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
 	call wait							  ; wait procedure
 	call display_score                    ; lightens the 7 seg again
-	beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
+	beq t7, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
 	jmpi blink_loop                       ; else loops again
 
 BLINK_end:
@@ -721,7 +713,6 @@ wait:
 	slli t0, t0, 6
 loopWait:
 	addi t0, t0, -1
-	addi t1, zero, COUNTER
 	bge t0, zero, loopWait
 	ret
 
