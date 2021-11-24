@@ -66,10 +66,12 @@ main:
 	addi t0, zero, 0
 	stw t0, CP_VALID(zero)
   init:
-	call wait
+	;call wait
 	call init_game
+	call clear_leds
+	call draw_array
   mainloop:
-	call wait
+	;call wait
 	call get_input
 	addi s0, v0, 0 				; stores the returned input value in s0
 	addi t0, zero, BUTTON_CHECKPOINT
@@ -701,7 +703,7 @@ blink_loop:
 	stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
 	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
 	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
-	call wait							  ; wait procedure
+	;	call wait							  ; wait procedure
 	call display_score                    ; lightens the 7 seg again
 	beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
 	jmpi blink_loop                       ; else loops again

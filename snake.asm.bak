@@ -66,8 +66,10 @@ main:
 	addi t0, zero, 0
 	stw t0, CP_VALID(zero)
   init:
+	call wait
 	call init_game
   mainloop:
+	call wait
 	call get_input
 	addi s0, v0, 0 				; stores the returned input value in s0
 	addi t0, zero, BUTTON_CHECKPOINT
