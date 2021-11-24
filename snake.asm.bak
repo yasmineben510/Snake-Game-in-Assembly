@@ -42,6 +42,8 @@
 .equ    RET_COLLISION,  2       ; return value for hit_test when a collision was detected
 .equ    ARG_HUNGRY,     0       ; a0 argument for move_snake when food wasn't eaten
 .equ    ARG_FED,        1       ; a0 argument for move_snake when food was eaten
+.equ	COUNTER,		32767	; value of the wait decrement counter
+
 
 ; initialize stack pointer
 addi    sp, zero, LEDS
@@ -54,37 +56,74 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
-    add a0, zero, zero           ; sets food to zero
-    addi t0, zero, 4             ; GSA direction value : RIGHT
-    addi t1, zero, 11
-    addi s1, zero, 1
 
-    stw t1, HEAD_X(zero)		 ; position x of head =11
-	stw zero, HEAD_Y(zero) 		 ; position y of head = 0
-    stw t1, TAIL_X(zero)		 ; position x of head = 11
-	stw zero, TAIL_Y(zero) 		 ; position y of head = 0
+	addi sp, sp, -12
+	stw s0, 8(sp)					; STACKS registers s0/ previous values
+	stw s1, 4(sp)
+	stw s2, 0(sp)
 
-    slli t2, t1, 3 			   	 ; multiplies x by 8
-	add t2, t2, zero 			 ; adds y => t2 is the linear adress of head on GSA
-    slli t2, t2, 2               ; gets the right address
-    stw t0, GSA(t2) 			 ; direction RIGHT in GSA  => collision
-  
-	call clear_leds 		
+	;--CODE HERE: INIT CP VALID TO 0
+	addi t0, zero, 0
+	stw t0, CP_VALID(zero)
+  init:
+	call init_game
+  mainloop:
 	call get_input
-    call hit_test
-    beq v0, zero, noColl
-    beq v0, s1, create_food
-    jmpi main
+	addi s0, v0, 0 				; stores the returned input value in s0
+	addi t0, zero, BUTTON_CHECKPOINT
+	beq t0,s0, state_Checkpoint ; branches to the state checkpoint if button checkpoint pressed otherwise continues
+
+	state_hitTest:
+	call hit_test
+	addi s2, v0, 0 				; stores the return value of the hit test (register s2)
+	addi t0, zero, RET_ATE_FOOD
+	beq t0,s2, state_increment_score
+
+	addi t0,zero ,RET_COLLISION
+	beq s2,t0, init
+	addi a0, zero, ARG_HUNGRY		;sets arguments for move_snake when food not eaten
+	call move_snake
+	jmpi state_draw
+
+
+	state_increment_score:
+	ldw t1, SCORE(zero)
+	addi t1, t1, 1				; increments the score by 1
+	stw t1, SCORE(zero)
+	call display_score
+	addi a0, zero, ARG_FED		;sets arguments for move_snake when food eaten
+	call move_snake
+	call create_food
+	call save_checkpoint
+	addi t0, zero, 1 			; stores value for a saved checkpoint
+	beq v0,t0, state_blinkScore
+	jmpi state_draw
+
+
+	state_Checkpoint:
+	call restore_checkpoint
+	addi s1, v0, 0
+	addi t0, zero, 0
+	beq s1, t0, mainloop
+
+	state_blinkScore:
+	call blink_score
+
+	state_draw:
+	call clear_leds
+	call draw_array
+    jmpi mainloop
+
+
+	ldw s2, 0(sp)
+	addi sp, sp, 4
+	ldw s1, 0(sp)
+	addi sp, sp, 4
+	ldw s0, 0(sp)
+	addi sp, sp, 4
+
     ret
 
-isfood:
-   call create_food
-   ret
-
-noColl:
-   call move_snake
-   call draw_array
-   ret
 
 ; BEGIN: clear_leds
 clear_leds:
@@ -96,7 +135,7 @@ clear_leds:
 
 ; END: clear_leds
 
-;----------------------------------SET_PIXEL--------------------------------------
+;----------------------------------GET_INPUT--------------------------------------
 
 ; BEGIN: set_pixel
 set_pixel:
@@ -139,8 +178,8 @@ moduloop:
   jmpi moduloop
 
 DISP_sel :
-  slli t0, t0, 2                      ; allows us to find the word-aligned address in our table
-  slli t1, t1, 2                      ; allows us to find the word-aligned address in our table
+  slli t0, t0, 4                      ; allows us to find the word-aligned address in our table
+  slli t1, t1, 4                      ; allows us to find the word-aligned address in our table
   ldw  t3,  digit_map(t1)             ; finds the right combination to the 3rd 7-seg
   ldw  t4,  digit_map(t0)             ; finds the right combination to the 4th 7-seg
   ldw  t5,  digit_map(zero)           ; finds the default value for zero
@@ -328,7 +367,6 @@ scoreIncrement:
 
 ; END: hit_test
 
-
 ;----------------------------------GET_INPUT--------------------------------------
 
 ; BEGIN: get_input
@@ -440,7 +478,6 @@ draw_array:
 	addi sp, sp, 4
 	ldw s0, 0(sp)
 	addi sp, sp, 4
-
 	ldw ra, 0(sp)				;pop the initial return value
 	addi sp, sp, 4
 	ret
@@ -566,7 +603,41 @@ endMove:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
+	addi v0, zero, 0
+moduloopSave:
+	addi t2, t0, -10				  ; compute the number of time we have 10 in t0 by substracting 10
+	blt  t2, zero, endModuloop		  ; if value is smaller than zero, result : t0=the result of the modulo 10
+	addi t1, t1, 1                    ; increments quotient value
+	add  t0, t2, zero                 ; computes new rest value
+	jmpi moduloopSave
+endModuloop:
 
+	bne t0, zero, endSave			  ; if the score is not a multiple of 10, finsishes the method	
+	;-----CASE CP CALL IS VALID-----
+	addi v0, zero, 1				; returns adress 0
+	stw v0, CP_VALID(zero)			; sets the CP_VALID to 1
+
+	;----stores the gamestate----
+	addi sp, sp, -4 			; pushes the return adress
+	stw ra, 0(sp)
+	
+	addi a1, zero, CP_HEAD_X 	; init value of iteration over dest data adress
+	addi a0, zero, HEAD_X		; init value of iteration over source data adress
+
+	addi t5, zero, GSA			; computing of limit value for t7
+	addi t5, t5, 384			; computing of limit value for t7=> GSAaddr + 96*4
+
+loopsave:
+	call copy_data
+	addi a1, a1, 4
+	addi a0, a0, 4
+	bne a0, t5, loopsave
+	;----------------endloop and END CASE restore--------
+
+	ldw ra, 0(sp)				;pop the initial return value
+	addi sp, sp, 4
+endSave:
+	ret
 
 ; END: save_checkpoint
 
@@ -574,14 +645,39 @@ save_checkpoint:
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
+	ldw t0, CP_VALID(zero)		; loads the value of CP_VALID in t0
+	addi t1, zero, 1 			; value of a valid checkpoint
+	addi v0, zero, 0
+	bne t0, t1, endRestore		; if the checkpoint is not valid, finishes the method
+
+	;-----CASE restores the gamestate checkpoint-----
+	addi sp, sp, -4 			; pushes the return adress
+	stw ra, 0(sp)
+
+	addi v0, zero, 1			; returns 1 because the checkpoint is valid
+	addi a0, zero, CP_HEAD_X 	; init value of iteration over source data adress
+	addi a1, zero, HEAD_X		; init value of iteration over dest data adress
+
+	addi t5, zero, GSA			; computing of limit value for t7
+	addi t5, t5, 384			; computing of limit value for t7=> GSAaddr + 96*4
+loopstore:
+	call copy_data
+	addi a0, a0, 4
+	addi a1, a1, 4
+	bne a1, t5, loopstore
+	;----------------endloop and END CASE restore--------
+	ldw ra, 0(sp)				;pop the initial return value
+	addi sp, sp, 4
 endRestore:
 	ret
 
 ; END: restore_checkpoint
 
+;------------------------------------------COPY_DATA------------------------------------
 ;---procedure to copy data from adress to another
 ; 	arg a0: adress to load data to copy
 ;	arg a1: adress to store copied data
+
 copy_data:
 	ldw t0, 0(a0)
 	stw t0, 0(a1)
@@ -591,24 +687,40 @@ copy_data:
 
 ; BEGIN: blink_score
 blink_score:
-  addi t3, zero, 3                     ; number of times it will blink = 3
-  jmpi blink_loop
+	addi t3, zero, 3                     ; number of times it will blink = 3
+	jmpi blink_loop
 
 blink_loop:
-  addi t3, t3, -1
-  stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
-  stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
-  stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
-  stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
-  ; wait procedure
-  call display_score                    ; lightens the 7 seg again
-  beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
-  jmpi blink_loop                       ; else loops again
+	addi sp, sp, -4 
+	stw ra, 0(sp) 				; stacks the main return address
+
+	addi t3, t3, -1
+	stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
+	stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
+	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
+	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
+	call wait							  ; wait procedure
+	call display_score                    ; lightens the 7 seg again
+	beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
+	jmpi blink_loop                       ; else loops again
 
 BLINK_end:
-  ret
+	ldw ra, 0(sp)
+	addi sp, sp, 4
+	ret
 
 ; END: blink_score
+
+wait:
+	addi t0, zero, COUNTER
+loopWait1:
+	addi t0, t0, -1
+	addi t1, zero, COUNTER
+loopWait2:
+	addi t1, t1, -1
+	bge t1, zero, loopWait2
+	bge t0, zero, loopWait1
+	ret
 
 
 digit_map:
