@@ -19,6 +19,30 @@
 .equ    RANDOM_NUM,     0x2010  ; Random number generator address
 .equ    BUTTONS,        0x2030  ; Buttons addresses
 
+; button state
+.equ    BUTTON_NONE,    0
+.equ    BUTTON_LEFT,    1
+.equ    BUTTON_UP,      2
+.equ    BUTTON_DOWN,    3
+.equ    BUTTON_RIGHT,   4
+.equ    BUTTON_CHECKPOINT,    5
+
+; array state
+.equ    DIR_LEFT,       1       ; leftward direction
+.equ    DIR_UP,         2       ; upward direction
+.equ    DIR_DOWN,       3       ; downward direction
+.equ    DIR_RIGHT,      4       ; rightward direction
+.equ    FOOD,           5       ; food
+
+; constants
+.equ    NB_ROWS,        8       ; number of rows
+.equ    NB_COLS,        12      ; number of columns
+.equ    NB_CELLS,       96      ; number of cells in GSA
+.equ    RET_ATE_FOOD,   1       ; return value for hit_test when food was eaten
+.equ    RET_COLLISION,  2       ; return value for hit_test when a collision was detected
+.equ    ARG_HUNGRY,     0       ; a0 argument for move_snake when food wasn't eaten
+.equ    ARG_FED,        1       ; a0 argument for move_snake when food was eaten
+
 ; initialize stack pointer
 addi    sp, zero, LEDS
 
@@ -30,22 +54,71 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
-    add a0, zero, zero           ; sets food to zero
-    addi t0, zero, 4
 
-    stw zero, HEAD_X(zero)		 ; position x of head
-	stw zero, HEAD_Y(zero) 		 ; position y of head
-    stw zero, TAIL_X(zero)		 ; position x of head
-	stw zero, TAIL_Y(zero) 		 ; position y of head
-  ;  stw t0, GSA(zero)            ; direction down in GSA
+	addi sp, sp, -12
+	stw s0, 8(sp)					; STACKS registers s0/ previous values
+	stw s1, 4(sp)
+	stw s2, 0(sp)
+
+	;--CODE HERE: INIT CP VALID TO 0
+	addi t0, zero, 0
+	stw t0, CP_VALID(zero)
+  init:
+	call init_game
   mainloop:
-	call clear_leds 		
-;	call get_input
-	call create_food
-	call draw_array
-;	call move_snake
+	call get_input
+	addi s0, v0, 0 				; stores the returned input value in s0
+	addi t0, zero, BUTTON_CHECKPOINT
+	beq t0,s0, state_Checkpoint ; branches to the state checkpoint if button checkpoint pressed otherwise continues
 
+	state_hitTest:
+	call hit_test
+	addi s2, v0, 0 				; stores the return value of the hit test (register s2)
+	addi t0, zero, RET_ATE_FOOD
+	beq t0,s2, state_increment_score
+
+	addi t0,zero ,RET_COLLISION
+	beq s2,t0, init
+	addi a0, zero, ARG_HUNGRY		;sets arguments for move_snake when food not eaten
+	call move_snake
+	jmpi state_draw
+	
+
+	state_increment_score:
+	ldw t1, SCORE(zero)
+	addi t1, t1, 1				; increments the score by 1
+	stw t1, SCORE(zero)
+	call display_score
+	addi a0, zero, ARG_FED		;sets arguments for move_snake when food eaten
+	call move_snake
+	call create_food
+	call save_checkpoint
+	addi t0, zero, 1 			; stores value for a saved checkpoint
+	beq v0,t0, state_blinkScore
+	jmpi state_draw
+	
+
+	state_Checkpoint:
+	call restore_checkpoint
+	addi s1, v0, 0 
+	addi t0, zero, 0
+	beq s1, t0, mainloop
+
+	state_blinkScore:
+	call blink_score
+
+	state_draw:
+	call clear_leds 		
+	call draw_array
     jmpi mainloop
+
+	
+	ldw s2, 0(sp)
+	addi sp, sp, 4
+	ldw s1, 0(sp)
+	addi sp, sp, 4
+	ldw s0, 0(sp)
+	addi sp, sp, 4
 
     ret
 
@@ -63,7 +136,7 @@ clear_leds:
 
 ; BEGIN: set_pixel
 set_pixel:
-	;compute the LEDS WORD adress
+	;----compute the LEDS WORD adress-----------
 	srli t0, a0, 2    		    ; shifts right by 2 (divides by 4)
 	slli t0, t0, 2				; shifts left by 2 : Word adress In lEDS stored in t0
 
@@ -94,6 +167,56 @@ display_score:
 
 ; BEGIN: init_game
 init_game:
+	;-----clear GSA----
+	addi sp, sp, -8
+	stw s0, 4(sp)					; STACKS registers s0/s1 previous values
+	stw s1, 0(sp)
+
+	addi s0, zero, -1				; iterator x init
+
+	loopDrawXClear:
+	addi s0, s0, 1					; increments x by 1
+	addi s1, zero, -1				; iterator y init again
+	addi t3, zero, NB_COLS			; stop value of loop x
+
+	beq s0, t3, endClearGSA			; stop loop condition
+
+	loopDrawYClear:
+	addi s1, s1, 1					; increment y by 1
+	addi t5, zero, NB_ROWS			; stop value of loop y
+
+	beq s1, t5, loopDrawXClear		; end of first range loop of y, need to increment x
+	;-----computes the linear adress ---------
+	slli t6, s0, 3					; multiplies x by 8
+	add t6, t6, s1					; adds y => linear adress of head on GSA
+	slli t6, t6, 2					; adresses should be WORD_ALIGNED (*4)
+	;-----sets the adress to 0
+	addi t0, zero, 0 				; stores value 0
+	stw t0, GSA(t6)					; stores value 0 in GSA
+
+	jmpi loopDrawYClear				; loop
+
+	endClearGSA:
+	ldw s1, 0(sp)
+	addi sp, sp, 4
+	ldw s0, 0(sp)
+	addi sp, sp, 4
+
+	;-----Sets the snake to the top left corner-----
+	stw zero, HEAD_X(zero)		 ; position x of head
+	stw zero, HEAD_Y(zero) 		 ; position y of head
+    stw zero, TAIL_X(zero)		 ; position x of head
+	stw zero, TAIL_Y(zero) 		 ; position y of head
+	
+	;----sets movement to the right------------------
+	addi t0, zero, BUTTON_RIGHT
+	stw t0, GSA(zero)            ; direction right in GSA
+
+	;---set the score to zero
+	addi t0, zero, 0
+	stw t0, SCORE(zero)
+	;--display food at random location
+	jmpi create_food
 
 ; END: init_game
 
@@ -112,14 +235,6 @@ loopFood:
 	bne t4, t3, loopFood			; checks if the cell is empty to generate food => if not loop again
 	addi t3, zero, 5				; stores value 5
 	stw t3, GSA(t2)					; stores value 5 in the GSA AT LOCATION T2 = random * 4
-	;----------STACK SVAING ADRESS
-	;push ra
-	addi sp, sp, -4
-	stw ra, 4(sp)
-	call draw_array
-	; pop ra.
-	ldw ra, 4(sp)
-	addi sp, sp, 4
 	ret
 ; END: create_food
 
@@ -242,7 +357,7 @@ changeState:
    	slli t7, t5, 3 			   	 ; multiplies x by 8
 	add t7, t7, t6 				 ; adds y => linear adress of head on GSA in t0
     slli t7, t7, 2               ; fins the corresponding address
-    stw v0, GSA(t7) 			 ;sets the orientation vector of the head (same as the last head
+    stw v0, GSA(t7) 			 ; sets the orientation vector of the head (same as the last head
     jmpi endGET
 
 endGET: 
@@ -253,9 +368,9 @@ endGET:
 
 ; BEGIN: draw_array
 draw_array:
-addi sp, sp, -12
+	addi sp, sp, -12
 	stw ra, 8(sp)				; stacks the main return address
-	stw s0, 4(sp)
+	stw s0, 4(sp)				; STACKS registers s0/s1 previous values
 	stw s1, 0(sp)
 
 	addi s0, zero, -1			; iterator x init
@@ -263,13 +378,13 @@ addi sp, sp, -12
 	loopDrawX:
 	addi s0, s0, 1				; increments x by 1
 	addi s1, zero, -1			; iterator y init again
-	addi t3, zero, 12			; stop value of loop x
+	addi t3, zero, NB_COLS			; stop value of loop x
 
 	beq s0, t3, endDraw			; stop loop condition
 	loopDrawY:
 
 	addi s1, s1, 1				; increment y by 1
-	addi t5, zero, 8			; stop value of loop y
+	addi t5, zero, NB_ROWS		; stop value of loop y
 
 	beq s1, t5, loopDrawX		; end of first range loop of y, need to increment x
 	;-----computes the linear adress ---------
@@ -357,7 +472,11 @@ endHead:
 	add t7, t7, t6				; adds y => linear adress of head on GSA
 	slli t7, t7, 2				; adresse are word aligned
 
-	stw t0, GSA(t7) 			;sets the orientation vector of the head (same as the last head)
+	stw t0, GSA(t7) 			; sets the orientation vector of the head (same as the last head)
+
+	;---------Checks if the food was eaten--------
+	addi t5, zero, ARG_FED		; stores in value t5 the value of ARG_FED argument
+	beq a0, t5, endMove			; will skip the changing coordinates of the tail if food was eaten
 
 	;--------value of snake's tail ---------------
 	ldw t5, TAIL_X(zero) 		; position x of tail
@@ -376,7 +495,7 @@ endHead:
 	beq t7, t3, downy
 	beq t7, t4, righty
 	jmpi endTail
-;---updates the TAIL X AND TAIL Y COORDINATES ; NOTE Still needs to compute mod 12 for the new x and y
+;---updates the TAIL X AND TAIL Y COORDINATES ; 
 
 lefty: 							; updates the x coord to the left 
 								; position x in t5
@@ -406,6 +525,7 @@ endTail:
 ;-----Clear last tail position---
 	addi t7, zero, 0
 	stw t7, GSA(t0)
+endMove:
 	ret
 ; END: move_snake
 
@@ -421,6 +541,10 @@ restore_checkpoint:
 
 ; END: restore_checkpoint
 
+;---procedure to copy data from adress to another
+; 	arg a0: adress to load data to copy
+;	arg a1: adress to store copied data
+copy_data:
 
 ; BEGIN: blink_score
 blink_score:
