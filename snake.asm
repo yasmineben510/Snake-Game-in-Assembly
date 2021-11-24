@@ -82,7 +82,7 @@ main:
 	addi a0, zero, ARG_HUNGRY		;sets arguments for move_snake when food not eaten
 	call move_snake
 	jmpi state_draw
-	
+
 
 	state_increment_score:
 	ldw t1, SCORE(zero)
@@ -96,11 +96,11 @@ main:
 	addi t0, zero, 1 			; stores value for a saved checkpoint
 	beq v0,t0, state_blinkScore
 	jmpi state_draw
-	
+
 
 	state_Checkpoint:
 	call restore_checkpoint
-	addi s1, v0, 0 
+	addi s1, v0, 0
 	addi t0, zero, 0
 	beq s1, t0, mainloop
 
@@ -108,11 +108,11 @@ main:
 	call blink_score
 
 	state_draw:
-	call clear_leds 		
+	call clear_leds
 	call draw_array
     jmpi mainloop
 
-	
+
 	ldw s2, 0(sp)
 	addi sp, sp, 4
 	ldw s1, 0(sp)
@@ -127,12 +127,12 @@ main:
 clear_leds:
 	stw zero, LEDS(zero)
 	stw zero, (LEDS + 4)(zero)
-	stw zero, (LEDS + 8)(zero) 
+	stw zero, (LEDS + 8)(zero)
 
 	ret
 
 ; END: clear_leds
-	
+
 
 ; BEGIN: set_pixel
 set_pixel:
@@ -151,7 +151,7 @@ set_pixel:
 	;----loads word and make an or------
 	ldw t4, LEDS(t0)
 	or t2, t4, t2 				; previous value OR new value (bitwise)
-	
+
 	;----store the new word----
 	stw t2, LEDS(t0)
 
@@ -161,6 +161,31 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
+  ldw t0, CP_SCORE(zero)              ; takes the value of the score
+  add t1, zero, zero                  ; prepares the quotient q (now =0)
+  bne t0, zero, moduloop              ; proceeds to compute the values of the 7-seg display if the value of the score is not the all zero value
+  jmpi DISP_sel
+
+moduloop:
+  addi t2, t0, -10                    ; compute the number of time we have 10 in t0 by substracting 10
+  blt  t2, zero, DISP_sel             ; if value is smaller than zero, we already have our result : t1=q (first iter => 0), t0=the right value
+  addi t1, t1, 1                      ; increments quotient value
+  add  t0, t2, zero                   ; computes new rest value
+  jmpi moduloop
+
+DISP_sel :
+  slli t0, t0, 4                      ; allows us to find the word-aligned address in our table
+  slli t1, t1, 4                      ; allows us to find the word-aligned address in our table
+  ldw  t3,  digit_map(t1)             ; finds the right combination to the 3rd 7-seg
+  ldw  t4,  digit_map(t0)             ; finds the right combination to the 4th 7-seg
+  ldw  t5,  digit_map(zero)           ; finds the default value for zero
+
+  stw  t5, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
+  stw  t5, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
+  stw  t3, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
+  stw  t4, (SEVEN_SEGS + 12)(zero)     ; 7-seg 3 equals the rest value
+
+  ret
 
 ; END: display_score
 
@@ -207,7 +232,7 @@ init_game:
 	stw zero, HEAD_Y(zero) 		 ; position y of head
     stw zero, TAIL_X(zero)		 ; position x of head
 	stw zero, TAIL_Y(zero) 		 ; position y of head
-	
+
 	;----sets movement to the right------------------
 	addi t0, zero, BUTTON_RIGHT
 	stw t0, GSA(zero)            ; direction right in GSA
@@ -248,16 +273,16 @@ hit_test:
 	add t2, t2, t1 				 ; adds y => t2 is the linear adress of head on GSA
     slli t2, t2, 2               ; gets the right address
     ldw t3, GSA(t2) 			 ; gets the orientation vector of the head (same as the last head)
-     
+
     beq t0, zero, checkLeft      ; checks if both x=0 and GSA=1
     beq t1, zero, checkUp        ; checks if both y=0 and GSA =2
-    addi t4, zero, 7            
+    addi t4, zero, 7
     beq t1, t4, checkDown        ; checks if both y=7 and GSA =3
-    addi t4, zero, 11   
+    addi t4, zero, 11
     beq t0, t4, checkRight       ; checks if both y=7 and GSA =4
-   
+
     jmpi GSAValue
-    
+
 
 checkLeft:
     addi t4, zero, 1
@@ -276,17 +301,17 @@ checkDown:
 
 checkRight:
     addi t4, zero, 4
-    beq t3, t4, abort           
+    beq t3, t4, abort
     jmpi GSAValue
 
-GSAValue:  
+GSAValue:
     beq t3, zero, noCollision   ; if the GSA value is zero, there is no collision
     addi t4, zero, 5
     beq t3, t4, scoreIncrement  ; if the GSA value is one there is a food => score increment
     jmpi abort                  ; else there is a bit of the snake => abort
 
 abort:
-    addi v0, zero, 2   
+    addi v0, zero, 2
     ret
 
 noCollision:
@@ -299,18 +324,17 @@ scoreIncrement:
 
 ; END: hit_test
 
-
 ; BEGIN: get_input
 get_input:
     ldw t0, (BUTTONS + 4)(zero)  ; gets the edgecapture
     andi t6, t0, 31              ; gets the 5 LSBs
-     
+
     ldw t1, BUTTONS(zero)        ; gets the status
     andi t7, t1, 31              ; gets the 5 LSBs
-    
+
     bne  t6, zero, checkpoint    ; branches to checkpoint if buttons were pushed
     add  v0, zero, zero          ; returns 0
-    jmpi  endGET                 ; jumps to endGET 
+    jmpi  endGET                 ; jumps to endGET
 
 
 checkpoint:
@@ -320,12 +344,12 @@ checkpoint:
 
     beq  t2, zero, directions    ; branches to direction if checkpoint button hasn't been pressed
     addi  v0, zero, 5            ; returns 5
-    jmpi  endGET                 ; jumps to endGET 
+    jmpi  endGET                 ; jumps to endGET
 
 
 directions:
-    
-    srl t1, t6, t0               ; 
+
+    srl t1, t6, t0               ;
     andi t1, t1, 1               ; gives the t0'th bit of the edgecapture, with step above
     addi t0, t0, 1               ; increment current by one
     beq t1, zero, directions     ; if the bit is not 1, it is not the right one, we loop
@@ -340,27 +364,27 @@ state:
 
 computeState:
 
-    srl t1, t7, t3               ; 
+    srl t1, t7, t3               ;
     andi t1, t1, 1               ; gives the t3'th bit of the status, with step above
     addi t3, t3, 1               ; increment current by one
     bne t1, zero, computeState          ; if the bit is not 0, it is not the right one, we loop again
     add t4, v0, t3               ; add our pushed button with our status, if the addition is equal to 5 we do not modify the state of our snake
-    addi t5, zero, 5            
+    addi t5, zero, 5
     bne  t5, t4, changeState
     jmpi endGET
 
 
-changeState:  
+changeState:
     ; do not need the ancient t6 and t7 values
     ldw t5, HEAD_X(zero)		 ; position x of head
 	ldw t6, HEAD_Y(zero) 		 ; position y of head
    	slli t7, t5, 3 			   	 ; multiplies x by 8
 	add t7, t7, t6 				 ; adds y => linear adress of head on GSA in t0
     slli t7, t7, 2               ; fins the corresponding address
-    stw v0, GSA(t7) 			 ; sets the orientation vector of the head (same as the last head
+    stw v0, GSA(t7) 			 ;sets the orientation vector of the head (same as the last head
     jmpi endGET
 
-endGET: 
+endGET:
     stw zero, (BUTTONS + 4)(zero); sets edgecapture at 0
     ret
 ; END: get_input
@@ -396,11 +420,11 @@ draw_array:
 
 	addi t0, zero, 0 			; stores value 0
 	beq t0, t2, loopDrawY		; if t2 is zero, loop
-		 
+
 	; ------sets a0 to x and a1 to y----
 	add a0, s0, zero
 	add a1, s1, zero
-	call set_pixel 
+	call set_pixel
 	jmpi loopDrawY
 
 	endDraw:
@@ -408,9 +432,9 @@ draw_array:
 	addi sp, sp, 4
 	ldw s0, 0(sp)
 	addi sp, sp, 4
-		
-	ldw ra, 0(sp)				;pop the initial return value 
-	addi sp, sp, 4		
+
+	ldw ra, 0(sp)				;pop the initial return value
+	addi sp, sp, 4
 	ret
 ; END: draw_array
 
@@ -439,26 +463,26 @@ move_snake:
 	beq t0, t3, down
 	beq t0, t4, right
 
-;---updates the HEAD X AND HEAD Y COORDINATES ; 
-left:							; updates the x coord to the left 
+;---updates the HEAD X AND HEAD Y COORDINATES ;
+left:							; updates the x coord to the left
 	ldw t7, HEAD_X(zero) 		; position x of head
 	addi t5, t7, -1
 	stw t5, HEAD_X(zero)
 	jmpi endHead
-up:								; updates the y coord to the up 
+up:								; updates the y coord to the up
 	ldw t7, HEAD_Y(zero)		; position y of head
 	addi t5, t7, -1
 	stw t5, HEAD_Y(zero)
 	jmpi endHead
 
 down:
-	 ; updates the y coord to the down 
+	 ; updates the y coord to the down
 	ldw t7, HEAD_Y(zero) 		; position y of head
 	addi t5, t7, 1
 	stw t5, HEAD_Y(zero)
 	jmpi endHead
 
-right:  ; updates the x coord to the right 
+right:  ; updates the x coord to the right
 	ldw t7, HEAD_X(zero) 		; position x of head
 	addi t5, t7, 1
 	stw t5, HEAD_X(zero)
@@ -495,27 +519,27 @@ endHead:
 	beq t7, t3, downy
 	beq t7, t4, righty
 	jmpi endTail
-;---updates the TAIL X AND TAIL Y COORDINATES ; 
+;---updates the TAIL X AND TAIL Y COORDINATES ;
 
-lefty: 							; updates the x coord to the left 
+lefty: 							; updates the x coord to the left
 								; position x in t5
 	addi t5, t5, -1
 	stw t5, TAIL_X(zero)
 	jmpi endTail
-upy:  							; updates the y coord to the up 
+upy:  							; updates the y coord to the up
 	 							; position y of tail in t6
 	addi t6, t6, -1
 	stw t6, TAIL_Y(zero)
 	jmpi endTail
 
 downy:
-	 							; updates the y coord to the down 
+	 							; updates the y coord to the down
 	 							; position y of tail in t6
 	addi t6, t6, 1
 	stw t6, TAIL_Y(zero)
 	jmpi endTail
 
-righty:  						; updates the x coord to the right 
+righty:  						; updates the x coord to the right
 								; position x of tail in t5
 	addi t5, t5, 1
 	stw t5, TAIL_X(zero)
@@ -532,7 +556,7 @@ endMove:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
-	
+
 
 ; END: save_checkpoint
 
@@ -552,7 +576,36 @@ copy_data:
 	stw t0, 0(a1)
 	ret
 
-; BEGIN: blink_score
-blink_score:
+  ; BEGIN: blink_score
+  blink_score:
+    addi t3, zero, 3                     ; number of times it will blink = 3
+    jmpi blink_loop
 
-; END: blink_score
+  blink_loop:
+    addi t3, t3, -1
+    stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
+    stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
+    stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
+    stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
+    ; wait procedure
+    call display_score                    ; lightens the 7 seg again
+    beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
+    jmpi blink_loop                       ; else loops again
+
+  BLINK_end:
+    ret
+
+  ; END: blink_score
+
+
+  digit_map:
+    .word 0xFC ; 0
+    .word 0x60 ; 1
+    .word 0xDA ; 2
+    .word 0xF2 ; 3
+    .word 0x66 ; 4
+    .word 0xB6 ; 5
+    .word 0xBE ; 6
+    .word 0xE0 ; 7
+    .word 0xFE ; 8
+    .word 0xF6 ; 9
