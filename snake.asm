@@ -62,16 +62,17 @@ main:
 	stw s1, 4(sp)
 	stw s2, 0(sp)
 
-	;--CODE HERE: INIT CP VALID TO 0
+	;-- INIT CP VALID TO 0
 	addi t0, zero, 0
 	stw t0, CP_VALID(zero)
   init:
-	;call wait
+	call wait
 	call init_game
+	call display_score
 	call clear_leds
 	call draw_array
   mainloop:
-	;call wait
+	call wait
 	call get_input
 	addi s0, v0, 0 				; stores the returned input value in s0
 	addi t0, zero, BUTTON_CHECKPOINT
@@ -139,7 +140,7 @@ clear_leds:
 
 ; END: clear_leds
 
-;----------------------------------GET_INPUT--------------------------------------
+;----------------------------------SET_PIXEL-----------------------------------------------------------------------------
 
 ; BEGIN: set_pixel
 set_pixel:
@@ -165,11 +166,11 @@ set_pixel:
 	ret
 ; END: set_pixel
 
-;----------------------------------DISPLAY--------------------------------------
+;----------------------------------DISPLAY--------------------------------------------------------------------------------
 
 ; BEGIN: display_score
 display_score:
-  ldw t0, CP_SCORE(zero)              ; takes the value of the score
+  ldw t0, SCORE(zero)                 ; takes the value of the score
   add t1, zero, zero                  ; prepares the quotient q (now =0)
   bne t0, zero, moduloop              ; proceeds to compute the values of the 7-seg display if the value of the score is not the all zero value
   jmpi DISP_sel
@@ -182,8 +183,8 @@ moduloop:
   jmpi moduloop
 
 DISP_sel :
-  slli t0, t0, 4                      ; allows us to find the word-aligned address in our table
-  slli t1, t1, 4                      ; allows us to find the word-aligned address in our table
+  slli t0, t0, 2                      ; allows us to find the word-aligned address in our table
+  slli t1, t1, 2                      ; allows us to find the word-aligned address in our table
   ldw  t3,  digit_map(t1)             ; finds the right combination to the 3rd 7-seg
   ldw  t4,  digit_map(t0)             ; finds the right combination to the 4th 7-seg
   ldw  t5,  digit_map(zero)           ; finds the default value for zero
@@ -191,13 +192,13 @@ DISP_sel :
   stw  t5, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
   stw  t5, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
   stw  t3, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
-  stw  t4, (SEVEN_SEGS + 12)(zero)     ; 7-seg 3 equals the rest value
+  stw  t4, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
 
   ret
 
 ; END: display_score
 
-;----------------------------------INIT_GAME--------------------------------------
+;----------------------------------INIT_GAME--------------------------------------------------------------------------
 
 ; BEGIN: init_game
 init_game:
@@ -254,7 +255,7 @@ init_game:
 
 ; END: init_game
 
-;----------------------------------CREATE_FOOD--------------------------------------
+;----------------------------------CREATE_FOOD--------------------------------------------------------------
 
 ; BEGIN: create_food
 create_food:
@@ -273,7 +274,7 @@ loopFood:
 	ret
 ; END: create_food
 
-;----------------------------------HIT_TEST--------------------------------------
+;----------------------------------HIT_TEST-------------------------------------------------------------------
 
 ; BEGIN: hit_test
 hit_test:
@@ -371,7 +372,7 @@ scoreIncrement:
 
 ; END: hit_test
 
-;----------------------------------GET_INPUT--------------------------------------
+;----------------------------------GET_INPUT---------------------------------------------------------------------
 
 ; BEGIN: get_input
 get_input:
@@ -703,7 +704,7 @@ blink_loop:
 	stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
 	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
 	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
-	;	call wait							  ; wait procedure
+	call wait							  ; wait procedure
 	call display_score                    ; lightens the 7 seg again
 	beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
 	jmpi blink_loop                       ; else loops again
@@ -717,13 +718,11 @@ BLINK_end:
 
 wait:
 	addi t0, zero, COUNTER
-loopWait1:
+	slli t0, t0, 6
+loopWait:
 	addi t0, t0, -1
 	addi t1, zero, COUNTER
-loopWait2:
-	addi t1, t1, -1
-	bge t1, zero, loopWait2
-	bge t0, zero, loopWait1
+	bge t0, zero, loopWait
 	ret
 
 
