@@ -133,6 +133,7 @@ clear_leds:
 
 ; END: clear_leds
 
+;----------------------------------GET_INPUT--------------------------------------
 
 ; BEGIN: set_pixel
 set_pixel:
@@ -158,6 +159,7 @@ set_pixel:
 	ret
 ; END: set_pixel
 
+;----------------------------------DISPLAY--------------------------------------
 
 ; BEGIN: display_score
 display_score:
@@ -189,6 +191,7 @@ DISP_sel :
 
 ; END: display_score
 
+;----------------------------------INIT_GAME--------------------------------------
 
 ; BEGIN: init_game
 init_game:
@@ -245,6 +248,7 @@ init_game:
 
 ; END: init_game
 
+;----------------------------------CREATE_FOOD--------------------------------------
 
 ; BEGIN: create_food
 create_food:
@@ -263,6 +267,7 @@ loopFood:
 	ret
 ; END: create_food
 
+;----------------------------------HIT_TEST--------------------------------------
 
 ; BEGIN: hit_test
 hit_test:
@@ -323,6 +328,9 @@ scoreIncrement:
     ret
 
 ; END: hit_test
+
+
+;----------------------------------GET_INPUT--------------------------------------
 
 ; BEGIN: get_input
 get_input:
@@ -389,6 +397,7 @@ endGET:
     ret
 ; END: get_input
 
+;----------------------------------DRAW_ARRAY--------------------------------------
 
 ; BEGIN: draw_array
 draw_array:
@@ -438,6 +447,7 @@ draw_array:
 	ret
 ; END: draw_array
 
+;----------------------------------MOVE_SNAKE--------------------------------------
 
 ; BEGIN: move_snake
 move_snake:
@@ -553,6 +563,7 @@ endMove:
 	ret
 ; END: move_snake
 
+;----------------------------------SAVE_CHECKPOINT--------------------------------------
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
@@ -560,6 +571,7 @@ save_checkpoint:
 
 ; END: save_checkpoint
 
+;----------------------------------RESTORE_CHECKPOINT--------------------------------------
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
@@ -576,36 +588,38 @@ copy_data:
 	stw t0, 0(a1)
 	ret
 
-  ; BEGIN: blink_score
-  blink_score:
-    addi t3, zero, 3                     ; number of times it will blink = 3
-    jmpi blink_loop
+;----------------------------------BLINK_SCORE--------------------------------------
 
-  blink_loop:
-    addi t3, t3, -1
-    stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
-    stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
-    stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
-    stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
-    ; wait procedure
-    call display_score                    ; lightens the 7 seg again
-    beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
-    jmpi blink_loop                       ; else loops again
+; BEGIN: blink_score
+blink_score:
+  addi t3, zero, 3                     ; number of times it will blink = 3
+  jmpi blink_loop
 
-  BLINK_end:
-    ret
+blink_loop:
+  addi t3, t3, -1
+  stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
+  stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
+  stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
+  stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
+  ; wait procedure
+  call display_score                    ; lightens the 7 seg again
+  beq t3, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
+  jmpi blink_loop                       ; else loops again
 
-  ; END: blink_score
+BLINK_end:
+  ret
+
+; END: blink_score
 
 
-  digit_map:
-    .word 0xFC ; 0
-    .word 0x60 ; 1
-    .word 0xDA ; 2
-    .word 0xF2 ; 3
-    .word 0x66 ; 4
-    .word 0xB6 ; 5
-    .word 0xBE ; 6
-    .word 0xE0 ; 7
-    .word 0xFE ; 8
-    .word 0xF6 ; 9
+digit_map:
+  .word 0xFC ; 0
+  .word 0x60 ; 1
+  .word 0xDA ; 2
+  .word 0xF2 ; 3
+  .word 0x66 ; 4
+  .word 0xB6 ; 5
+  .word 0xBE ; 6
+  .word 0xE0 ; 7
+  .word 0xFE ; 8
+  .word 0xF6 ; 9
