@@ -54,74 +54,37 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
+    add a0, zero, zero           ; sets food to zero
+    addi t0, zero, 4             ; GSA direction value : RIGHT
+    addi t1, zero, 11
+    addi s1, zero, 1
 
-	addi sp, sp, -12
-	stw s0, 8(sp)					; STACKS registers s0/ previous values
-	stw s1, 4(sp)
-	stw s2, 0(sp)
+    stw t1, HEAD_X(zero)		 ; position x of head =11
+	stw zero, HEAD_Y(zero) 		 ; position y of head = 0
+    stw t1, TAIL_X(zero)		 ; position x of head = 11
+	stw zero, TAIL_Y(zero) 		 ; position y of head = 0
 
-	;--CODE HERE: INIT CP VALID TO 0
-	addi t0, zero, 0
-	stw t0, CP_VALID(zero)
-  init:
-	call init_game
-  mainloop:
+    slli t2, t1, 3 			   	 ; multiplies x by 8
+	add t2, t2, zero 			 ; adds y => t2 is the linear adress of head on GSA
+    slli t2, t2, 2               ; gets the right address
+    stw t0, GSA(t2) 			 ; direction RIGHT in GSA  => collision
+  
+	call clear_leds 		
 	call get_input
-	addi s0, v0, 0 				; stores the returned input value in s0
-	addi t0, zero, BUTTON_CHECKPOINT
-	beq t0,s0, state_Checkpoint ; branches to the state checkpoint if button checkpoint pressed otherwise continues
-
-	state_hitTest:
-	call hit_test
-	addi s2, v0, 0 				; stores the return value of the hit test (register s2)
-	addi t0, zero, RET_ATE_FOOD
-	beq t0,s2, state_increment_score
-
-	addi t0,zero ,RET_COLLISION
-	beq s2,t0, init
-	addi a0, zero, ARG_HUNGRY		;sets arguments for move_snake when food not eaten
-	call move_snake
-	jmpi state_draw
-
-
-	state_increment_score:
-	ldw t1, SCORE(zero)
-	addi t1, t1, 1				; increments the score by 1
-	stw t1, SCORE(zero)
-	call display_score
-	addi a0, zero, ARG_FED		;sets arguments for move_snake when food eaten
-	call move_snake
-	call create_food
-	call save_checkpoint
-	addi t0, zero, 1 			; stores value for a saved checkpoint
-	beq v0,t0, state_blinkScore
-	jmpi state_draw
-
-
-	state_Checkpoint:
-	call restore_checkpoint
-	addi s1, v0, 0
-	addi t0, zero, 0
-	beq s1, t0, mainloop
-
-	state_blinkScore:
-	call blink_score
-
-	state_draw:
-	call clear_leds
-	call draw_array
-    jmpi mainloop
-
-
-	ldw s2, 0(sp)
-	addi sp, sp, 4
-	ldw s1, 0(sp)
-	addi sp, sp, 4
-	ldw s0, 0(sp)
-	addi sp, sp, 4
-
+    call hit_test
+    beq v0, zero, noColl
+    beq v0, s1, create_food
+    jmpi main
     ret
 
+isfood:
+   call create_food
+   ret
+
+noColl:
+   call move_snake
+   call draw_array
+   ret
 
 ; BEGIN: clear_leds
 clear_leds:
@@ -133,7 +96,7 @@ clear_leds:
 
 ; END: clear_leds
 
-;----------------------------------GET_INPUT--------------------------------------
+;----------------------------------SET_PIXEL--------------------------------------
 
 ; BEGIN: set_pixel
 set_pixel:
@@ -176,8 +139,8 @@ moduloop:
   jmpi moduloop
 
 DISP_sel :
-  slli t0, t0, 4                      ; allows us to find the word-aligned address in our table
-  slli t1, t1, 4                      ; allows us to find the word-aligned address in our table
+  slli t0, t0, 2                      ; allows us to find the word-aligned address in our table
+  slli t1, t1, 2                      ; allows us to find the word-aligned address in our table
   ldw  t3,  digit_map(t1)             ; finds the right combination to the 3rd 7-seg
   ldw  t4,  digit_map(t0)             ; finds the right combination to the 4th 7-seg
   ldw  t5,  digit_map(zero)           ; finds the default value for zero
@@ -279,39 +242,75 @@ hit_test:
     slli t2, t2, 2               ; gets the right address
     ldw t3, GSA(t2) 			 ; gets the orientation vector of the head (same as the last head)
 
-    beq t0, zero, checkLeft      ; checks if both x=0 and GSA=1
-    beq t1, zero, checkUp        ; checks if both y=0 and GSA =2
-    addi t4, zero, 7
-    beq t1, t4, checkDown        ; checks if both y=7 and GSA =3
+    beq t0, zero, checkLeft      ; checks if both x=0 and GSA=1 = Left
     addi t4, zero, 11
-    beq t0, t4, checkRight       ; checks if both y=7 and GSA =4
+    beq t0, t4, checkRight       ; checks if both x=11 and GSA =4 = Right
+    beq t1, zero, checkUp        ; checks if both y=0 and GSA =2 = Up
+    addi t4, zero, 7
+    beq t1, t4, checkDown        ; checks if both y=7 and GSA =3  = Down
 
     jmpi GSAValue
 
 
 checkLeft:
-    addi t4, zero, 1
-    beq t3, zero, abort
+    addi t4, zero, 1            
+    beq t3, t4, abort           ; checks if GSA = 1
+    addi t4, zero, 7
+    beq t1, zero, checkUp       ; checks if y=0 as well, as x=0 has precedence
+    beq t1, t4, checkDown       ; checks if y=7 as well, as x=0 has precedence
     jmpi GSAValue
 
 checkUp:
-    addi t4, zero, 2
+    addi t4, zero, 2           ; checks if GSA = 2
     beq t3, t4, abort
     jmpi GSAValue
 
 checkDown:
-    addi t4, zero, 3
+    addi t4, zero, 3           ; checks if GSA = 3
     beq t3, t4, abort
     jmpi GSAValue
 
 checkRight:
-    addi t4, zero, 4
+    addi t4, zero, 4           ; checks if GSA = 4
     beq t3, t4, abort
+    addi t4, zero, 7
+    beq t1, zero, checkUp       ; checks if y=0 as well, as x=11 has precedence
+    beq t1, t4, checkDown       ; checks if y=7 as well, as x=11 has precedence
     jmpi GSAValue
 
 GSAValue:
+    addi t4, zero, 1
+    beq t3, t4, GSA_left
+    addi t4, t4, 1
+	beq t3, t4, GSA_up
+    addi t4, t4, 1
+	beq t3, t4, GSA_down
+	jmpi GSA_right
+
+GSA_left:
+  	addi t0, t0, -1
+    jmpi ComputeGSA
+
+GSA_up:
+	addi t1, t1, -1
+    jmpi ComputeGSA
+
+GSA_down:
+	addi t1, t1, 1
+    jmpi ComputeGSA
+
+GSA_right:
+	addi t0, t0, 1
+    jmpi ComputeGSA
+
+ComputeGSA:
+    slli t2, t0, 3 			   	 ; multiplies x by 8
+	add t2, t2, t1 				 ; adds y => t2 is the linear adress of head on GSA
+    slli t2, t2, 2               ; gets the right address
+    ldw t3, GSA(t2) 			 ; gets the future position of the head 
+
     beq t3, zero, noCollision   ; if the GSA value is zero, there is no collision
-    addi t4, zero, 5
+    addi t4, zero, FOOD         ; cste food = 5
     beq t3, t4, scoreIncrement  ; if the GSA value is one there is a food => score increment
     jmpi abort                  ; else there is a bit of the snake => abort
 
