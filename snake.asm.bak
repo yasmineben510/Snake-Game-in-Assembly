@@ -105,7 +105,7 @@ main:
 	call create_food
 	call save_checkpoint
 	addi t0, zero, 1 			; stores value for a saved checkpoint
-	beq v0,t0, state_blinkScore	; f checkpoint is saved (v0 =1) then blink score
+	beq v0,t0, state_blinkScore	; if checkpoint is saved (v0 =1) then blink score
 	jmpi state_draw
 
 
@@ -597,6 +597,9 @@ endMove:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
+	addi sp, sp, -4 			; pushes the return adress
+	stw ra, 0(sp)
+
 	addi v0, zero, 0
 	ldw t0, SCORE(zero)                 ; takes the value of the score
  	add t1, zero, zero                  ; prepares the quotient q (now =0)
@@ -618,8 +621,7 @@ endModuloopSave:
 	stw v0, CP_VALID(zero)			; sets the CP_VALID to 1
 
 	;----stores the gamestate----
-	addi sp, sp, -4 			; pushes the return adress
-	stw ra, 0(sp)
+
 	
 	addi a1, zero, CP_HEAD_X 	; init value of iteration over dest data adress
 	addi a0, zero, HEAD_X		; init value of iteration over source data adress
@@ -634,9 +636,9 @@ loopsave:
 	bne a0, t5, loopsave
 	;----------------endloop and END CASE restore--------
 
+endSave:
 	ldw ra, 0(sp)				;pop the initial return value
 	addi sp, sp, 4
-endSave:
 	ret
 	
 copy_data:
@@ -650,15 +652,15 @@ copy_data:
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
+	addi sp, sp, -4 			; pushes the return adress
+	stw ra, 0(sp)
+
 	ldw t0, CP_VALID(zero)		; loads the value of CP_VALID in t0
 	addi t1, zero, 1 			; value of a valid checkpoint
 	addi v0, zero, 0
 	bne t0, t1, endRestore		; if the checkpoint is not valid, finishes the method
 
 	;-----CASE restores the gamestate checkpoint-----
-	addi sp, sp, -4 			; pushes the return adress
-	stw ra, 0(sp)
-
 	addi v0, zero, 1			; returns 1 because the checkpoint is valid
 
 	addi a0, zero, CP_HEAD_X 	; init value of iteration over source data adress
@@ -672,9 +674,10 @@ loopstore:
 	addi a1, a1, 4
 	bne a1, t5, loopstore
 	;----------------endloop and END CASE restore--------
+	
+endRestore:
 	ldw ra, 0(sp)				;pop the initial return value
 	addi sp, sp, 4	
-endRestore:
 	ret
 
 copy_data2:
@@ -707,11 +710,11 @@ blink_loop:
 	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
 	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
 	addi a0, zero, COUNTER
-	slli a0, a0, 3
+	slli a0, a0, 4
 	call wait							  ; wait procedure
 	call display_score                    ; lightens the 7 seg again
 	addi a0, zero, COUNTER
-	slli a0, a0, 3
+	slli a0, a0, 4
 	call wait
 	beq s0, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
 	jmpi blink_loop                       ; else loops again
