@@ -66,12 +66,16 @@ main:
 	addi t0, zero, 0
 	stw t0, CP_VALID(zero)
   init:
+	addi a0, zero, COUNTER
+	slli a0, a0, 6
 	call wait
 	call init_game
 	call display_score
 	call clear_leds
 	call draw_array
   mainloop:
+	addi a0, zero, COUNTER
+	slli a0, a0, 6
 	call wait
 	call get_input
 	addi s0, v0, 0 				; stores the returned input value in s0
@@ -101,7 +105,7 @@ main:
 	call create_food
 	call save_checkpoint
 	addi t0, zero, 1 			; stores value for a saved checkpoint
-	beq v0,t0, state_blinkScore	; f checkpoint is saved (v0 =1) then blink score
+	beq v0,t0, state_blinkScore	; if checkpoint is saved (v0 =1) then blink score
 	jmpi state_draw
 
 
@@ -634,6 +638,11 @@ loopsave:
 	addi sp, sp, 4
 endSave:
 	ret
+	
+copy_data:
+	ldw t0, 0(a0)
+	stw t0, 0(a1)
+	ret
 
 ; END: save_checkpoint
 
@@ -658,50 +667,58 @@ restore_checkpoint:
 	addi t5, zero, GSA			; computing of limit value for a1
 	addi t5, t5, 384			; computing of limit value for a1=> GSAaddr + 96*4
 loopstore:
-	call copy_data
+	call copy_data2
 	addi a0, a0, 4
 	addi a1, a1, 4
 	bne a1, t5, loopstore
 	;----------------endloop and END CASE restore--------
 	ldw ra, 0(sp)				;pop the initial return value
-	addi sp, sp, 4
+	addi sp, sp, 4	
 endRestore:
+	ret
+
+copy_data2:
+	ldw t0, 0(a0)
+	stw t0, 0(a1)
 	ret
 
 ; END: restore_checkpoint
 
-;------------------------------------------COPY_DATA------------------------------------
+
 ;---procedure to copy data from adress to another
 ; 	arg a0: adress to load data to copy
 ;	arg a1: adress to store copied data
 
-copy_data:
-	ldw t0, 0(a0)
-	stw t0, 0(a1)
-	ret
 
 ;----------------------------------BLINK_SCORE--------------------------------------
 
 ; BEGIN: blink_score
 blink_score:
-	addi sp, sp, -4 
-	stw ra, 0(sp) 				; stacks the main return address
+	addi sp, sp, -8 
+	stw ra, 4(sp) 				; stacks the main return address
+	stw s0, 0(sp)
 
-	addi t7, zero, 3                     ; number of times it will blink = 3
-	jmpi blink_loop
+	addi s0, zero, 3                     ; number of times it will blink = 3
 
 blink_loop:
-	addi t7, t7, -1
+	addi s0, s0, -1
 	stw  zero, SEVEN_SEGS(zero)           ; 7-seg 0 equals zero
 	stw  zero, (SEVEN_SEGS + 4)(zero)     ; 7-seg 1 equals zero
 	stw  zero, (SEVEN_SEGS + 8)(zero)     ; 7-seg 2 equals the quotient value
 	stw  zero, (SEVEN_SEGS + 12)(zero)    ; 7-seg 3 equals the rest value
+	addi a0, zero, COUNTER
+	slli a0, a0, 4
 	call wait							  ; wait procedure
 	call display_score                    ; lightens the 7 seg again
-	beq t7, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
+	addi a0, zero, COUNTER
+	slli a0, a0, 4
+	call wait
+	beq s0, zero, BLINK_end               ; ends the blink procedure if it has done it 3  times
 	jmpi blink_loop                       ; else loops again
 
 BLINK_end:
+	ldw s0, 0(sp)
+	addi sp, sp, 4
 	ldw ra, 0(sp)
 	addi sp, sp, 4
 	ret
@@ -709,8 +726,7 @@ BLINK_end:
 ; END: blink_score
 
 wait:
-	addi t0, zero, COUNTER
-	slli t0, t0, 6
+	add t0, a0, zero
 loopWait:
 	addi t0, t0, -1
 	bge t0, zero, loopWait
