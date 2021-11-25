@@ -70,9 +70,6 @@ main:
 	slli a0, a0, 6
 	call wait
 	call init_game
-	call display_score
-	call clear_leds
-	call draw_array
   mainloop:
 	addi a0, zero, COUNTER
 	slli a0, a0, 6
@@ -117,6 +114,7 @@ main:
 
 	state_blinkScore:
 	call blink_score
+;	stw zero, (BUTTONS + 4)(zero); sets edgecapture at 0
 
 	state_draw:
 	call clear_leds
@@ -206,7 +204,8 @@ DISP_sel :
 ; BEGIN: init_game
 init_game:
 	;-----clear GSA----
-	addi sp, sp, -8
+	addi sp, sp, -12
+	stw ra, 8(sp)
 	stw s0, 4(sp)					; STACKS registers s0/s1 previous values
 	stw s1, 0(sp)
 
@@ -235,6 +234,7 @@ init_game:
 	jmpi loopDrawYClear				; loop
 
 	endClearGSA:
+
 	ldw s1, 0(sp)
 	addi sp, sp, 4
 	ldw s0, 0(sp)
@@ -254,7 +254,14 @@ init_game:
 	addi t0, zero, 0
 	stw t0, SCORE(zero)
 	;--display food at random location
-	jmpi create_food
+	call create_food
+	call display_score
+	call clear_leds
+	call draw_array
+
+	ldw ra, 0(sp)
+	addi sp, sp, 4
+	ret
 
 ; END: init_game
 
